@@ -168,6 +168,8 @@ body[data-day="cal"] .date-row,body[data-day="cal"] #editBtn{display:none}
 
 /* full-screen exercise */
 body.focusing #app,body.focusing nav.tabs{display:none}
+/* while the keyboard is open, hide fixed bars so iOS doesn't push them over the inputs */
+body.kb .timer,body.kb nav.tabs{display:none}
 #focus{padding-top:calc(6px + env(safe-area-inset-top,0px))}
 .f-top{display:flex;align-items:center;gap:8px;margin-inline:-8px}
 .f-back{height:44px;padding:0 12px 0 4px;color:var(--accent);font-size:17px;font-weight:600;display:inline-flex;align-items:center;gap:2px;max-width:55%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -741,6 +743,10 @@ document.addEventListener('submit',e=>{
   $('#addName').value='';$('#addName').blur();
   mutateRoutine(r=>{dayOf(r).exercises.push({id,name:v})});toast(v+' añadido');
 });
+// keyboard open: hide the fixed timer/tab bar and keep the focused input centered
+function isField(el){return el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT')}
+document.addEventListener('focusin',e=>{if(!isField(e.target))return;document.body.classList.add('kb');const el=e.target;setTimeout(()=>{if(document.activeElement===el)el.scrollIntoView({block:'center',behavior:'smooth'})},300)});
+document.addEventListener('focusout',()=>{setTimeout(()=>{if(!isField(document.activeElement))document.body.classList.remove('kb')},50)});
 document.addEventListener('focusout',()=>{setTimeout(()=>{if(S.pendingRender&&!typingIn())render()},0)});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(S.sheet||S.calPick||S.daysEdit)closeSheet();else if(S.focus)closeFocus()}
