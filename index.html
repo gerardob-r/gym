@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Gym Split</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -168,6 +168,8 @@ body[data-day="cal"] .date-row,body[data-day="cal"] #editBtn{display:none}
 
 /* full-screen exercise */
 body.focusing #app,body.focusing nav.tabs{display:none}
+/* while the keyboard is open, hide fixed bars so iOS doesn't push them over the inputs */
+body.kb .timer,body.kb nav.tabs{display:none}
 #focus{padding-top:calc(6px + env(safe-area-inset-top,0px))}
 .f-top{display:flex;align-items:center;gap:8px;margin-inline:-8px}
 .f-back{height:44px;padding:0 12px 0 4px;color:var(--accent);font-size:17px;font-weight:600;display:inline-flex;align-items:center;gap:2px;max-width:55%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -206,8 +208,17 @@ body.focusing #app,body.focusing nav.tabs{display:none}
 .hidden-row span.n{flex:1;min-width:0}
 .btn2{height:40px;padding-inline:14px;border-radius:10px;background:var(--surface-2);color:var(--fg);font-weight:600;font-size:14px}
 .btn2:disabled{opacity:.4}
+/* No zoom (double-tap/pinch) and portrait only */
+html,body{touch-action:manipulation;overscroll-behavior:none}
+*{touch-action:manipulation}
+#rotateLock{display:none}
+@media (orientation:landscape) and (max-height:500px){
+  body:not(.kb) #rotateLock{display:flex;position:fixed;inset:0;z-index:99999;background:var(--bg);color:var(--fg);flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;font-family:var(--display);font-size:24px;letter-spacing:.02em;padding:24px}
+  body:not(.kb) #rotateLock svg{width:56px;height:56px;color:var(--muted)}
+}
 </style>
 </head><body>
+<div id="rotateLock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>Gira el teléfono en vertical</div>
 
 <div class="wrap" id="app">
   <header class="top">
@@ -741,6 +752,10 @@ document.addEventListener('submit',e=>{
   $('#addName').value='';$('#addName').blur();
   mutateRoutine(r=>{dayOf(r).exercises.push({id,name:v})});toast(v+' añadido');
 });
+// keyboard open: hide the fixed timer/tab bar and keep the focused input centered
+function isField(el){return el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT')}
+document.addEventListener('focusin',e=>{if(!isField(e.target))return;document.body.classList.add('kb');const el=e.target;setTimeout(()=>{if(document.activeElement===el)el.scrollIntoView({block:'center',behavior:'smooth'})},300)});
+document.addEventListener('focusout',()=>{setTimeout(()=>{if(!isField(document.activeElement))document.body.classList.remove('kb')},50)});
 document.addEventListener('focusout',()=>{setTimeout(()=>{if(S.pendingRender&&!typingIn())render()},0)});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(S.sheet||S.calPick||S.daysEdit)closeSheet();else if(S.focus)closeFocus()}
@@ -751,5 +766,6 @@ render();
 initStore();
 })();
 </script>
+<script>(function(){var p=function(e){e.preventDefault()};document.addEventListener("gesturestart",p,{passive:false});document.addEventListener("gesturechange",p,{passive:false});document.addEventListener("gestureend",p,{passive:false});document.addEventListener("touchmove",function(e){if(e.touches.length>1||(e.scale!==undefined&&e.scale!==1))e.preventDefault()},{passive:false});document.addEventListener("dblclick",p,{passive:false});try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock("portrait").catch(function(){})}catch(e){}})();</script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(function(){})}</script>
 </body></html>
