@@ -318,6 +318,11 @@ function render(){
   if(typingIn()){S.pendingRender=true;return}
   S.pendingRender=false;
   if(!S.loaded)return;
+  const y=window.scrollY,wasFocus=!!S.focus;
+  renderInner();
+  if(!!S.focus===wasFocus&&Math.abs(window.scrollY-y)>1)window.scrollTo(0,y);
+}
+function renderInner(){
   if(S.day!=='cal'){const cd=curDay();if(cd&&cd.id!==S.day)S.day=cd.id}
   document.body.dataset.day=S.day;
   document.body.style.setProperty('--accent',S.day==='cal'?OTHER:colOf(S.day));
@@ -743,10 +748,22 @@ document.addEventListener('submit',e=>{
   $('#addName').value='';$('#addName').blur();
   mutateRoutine(r=>{dayOf(r).exercises.push({id,name:v})});toast(v+' añadido');
 });
-// keyboard open: hide the fixed timer/tab bar and keep the focused input centered
+// keyboard open: hide the fixed timer/tab bar. No forced scrolling: iOS already brings the field
+// into view, and an extra centered scroll made the page creep down on its own while typing.
+// We only nudge the page the minimum needed if the field ends up hidden by the keyboard or the header.
 function isField(el){return el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT')}
-document.addEventListener('focusin',e=>{if(!isField(e.target))return;document.body.classList.add('kb');const el=e.target;setTimeout(()=>{if(document.activeElement===el)el.scrollIntoView({block:'center',behavior:'smooth'})},300)});
+function revealField(){
+  const el=document.activeElement;if(!isField(el)||!el.closest('#main,#focus'))return;
+  const vv=window.visualViewport,vTop=vv?vv.offsetTop:0,vH=vv?vv.height:window.innerHeight;
+  const hdr=!S.focus&&document.querySelector('header.top'),hB=hdr?hdr.getBoundingClientRect().bottom:0;
+  const r=el.getBoundingClientRect(),minY=Math.max(vTop,hB)+8,maxY=vTop+vH-8;
+  const d=r.bottom>maxY?r.bottom-maxY:r.top<minY?r.top-minY:0;
+  if(Math.abs(d)>2)window.scrollBy(0,d);
+}
+let kbT=0;
+document.addEventListener('focusin',e=>{if(!isField(e.target))return;document.body.classList.add('kb');clearTimeout(kbT);kbT=setTimeout(revealField,400)});
 document.addEventListener('focusout',()=>{setTimeout(()=>{if(!isField(document.activeElement))document.body.classList.remove('kb')},50)});
+if(window.visualViewport)visualViewport.addEventListener('resize',()=>{if(document.body.classList.contains('kb')){clearTimeout(kbT);kbT=setTimeout(revealField,120)}});
 document.addEventListener('focusout',()=>{setTimeout(()=>{if(S.pendingRender&&!typingIn())render()},0)});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(S.sheet||S.calPick||S.daysEdit)closeSheet();else if(S.focus)closeFocus()}
