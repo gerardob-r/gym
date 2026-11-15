@@ -52,6 +52,7 @@ main{display:flex;flex-direction:column;gap:14px;padding-block:16px}
 .ex-top{display:flex;align-items:flex-start;gap:10px}
 .ex-head{display:flex;align-items:flex-start;gap:8px;text-align:left;flex:1;min-width:0}
 .start{flex:none;height:40px;padding:0 14px 0 12px;border-radius:20px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:15px;display:inline-flex;align-items:center;gap:6px}
+.ex-head .ord{flex:none;display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;margin-top:-1px;border-radius:12px;background:var(--accent);color:#000;font-weight:800;font-size:14px;line-height:1}
 .ex-head h2{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.05;margin:0;flex:1;min-width:0;text-wrap:balance}
 .chev{color:var(--faint);font-size:22px;line-height:1}
 .meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -312,6 +313,23 @@ function setsFor(id){
   return Math.max(e?e.s.length:3,draftFor(id).length,1);
 }
 
+/* Exercise order: same order as the previous session of this workout.
+   Each saved entry carries t (time of first save); sessions before this feature have no t. */
+function prevOrder(day){
+  let prev=null;
+  for(const ex of day.exercises)for(const e of (S.hist[ex.id]||[]))if(e.d<S.date&&(!prev||e.d>prev))prev=e.d;
+  const pos={};if(!prev)return pos;
+  const done=[];
+  for(const ex of day.exercises){const e=entryOn(ex.id,prev);if(e&&e.t)done.push([e.t,ex.id])}
+  done.sort((a,b)=>a[0]-b[0]).forEach(([,id],i)=>pos[id]=i+1);
+  return pos;
+}
+function orderedEx(day){
+  if(!day)return [];
+  const pos=prevOrder(day),big=1e9;
+  return day.exercises.map((ex,i)=>({ex,i,n:pos[ex.id]||0})).sort((a,b)=>((a.n||big)-(b.n||big))||(a.i-b.i)).map(o=>({...o.ex,ord:o.n}));
+}
+
 /* ---------- render ---------- */
 function typingIn(){const a=document.activeElement;return a&&a.tagName==='INPUT'&&($('#main').contains(a)||$('#focus').contains(a))}
 function render(){
@@ -337,7 +355,7 @@ function renderInner(){
   const day=curDay();
   if(!day){$('#dayTitle').innerHTML='Gym <span>split</span>';main.innerHTML='<div class="empty"><b>Aún no hay rutina</b>Cuando se cargue tu rutina verás aquí los ejercicios de cada día.</div>';sheets();return}
   $('#dayTitle').innerHTML=esc(day.name)+' <span>day</span>';
-  main.innerHTML=(day.exercises.length?day.exercises.map((ex,i)=>S.edit?editCard(ex,i,day.exercises.length):card(ex)).join(''):'<div class="empty"><b>Sin ejercicios</b>Pulsa Editar para añadir el primero.</div>')
+  main.innerHTML=(day.exercises.length?(S.edit?day.exercises.map((ex,i)=>editCard(ex,i,day.exercises.length)):orderedEx(day).map(card)).join(''):'<div class="empty"><b>Sin ejercicios</b>Pulsa Editar para añadir el primero.</div>')
     +(S.edit?'<form class="add" id="addForm"><input id="addName" placeholder="Nuevo ejercicio" autocomplete="off" enterkeyhint="done"><button type="submit">Añadir</button></form><button class="btn2" type="button" data-days="1">Editar entrenos (nombres, colores, añadir o quitar)</button>':'');
   sheets();
 }
@@ -374,7 +392,7 @@ function card(ex){
   const n=setsFor(id),dr=draftFor(id),prevMax=maxOf(id,S.date);
   const savedPr=saved&&prevMax&&saved.s.some(([w])=>w>prevMax.w);
   return `<article class="ex${saved?' saved':''}" data-id="${id}">
-    <div class="ex-top"><button class="ex-head" type="button" data-open="${id}"><h2>${esc(ex.name)}</h2><span class="chev">›</span></button>
+    <div class="ex-top"><button class="ex-head" type="button" data-open="${id}">${ex.ord?`<span class="ord" title="Posición en el último entreno">${ex.ord}</span>`:''}<h2>${esc(ex.name)}</h2><span class="chev">›</span></button>
     <button class="start" type="button" data-start="${id}" aria-label="Empezar ${esc(ex.name)}">${PLAY14}Empezar</button></div>
     ${metaHtml(id,last,max,saved,savedPr)}
     ${setRows(id,n,dr,last,prevMax)}
@@ -411,7 +429,7 @@ function renderTimer(){const el=$('#timerBar');if(el)el.innerHTML=timerHtml()}
 function openFocus(id){tOff();S.focus=id;S.fSet=0;S.edit=false;S.confirmDel=null;window.scrollTo(0,0);render()}
 function closeFocus(){const id=S.focus;tOff();S.focus=null;render();const el=id&&document.querySelector('#main [data-id="'+CSS.escape(id)+'"]');if(el)el.scrollIntoView({block:'center'})}
 function renderFocus(){
-  const day=curDay(),list=day?day.exercises:[],idx=list.findIndex(e=>e.id===S.focus);
+  const day=curDay(),list=orderedEx(day),idx=list.findIndex(e=>e.id===S.focus);
   if(idx<0){tOff();S.focus=null;render();return}
   const ex=list[idx],id=ex.id,last=lastBefore(id,S.date),max=maxOf(id),saved=entryOn(id,S.date);
   const n=setsFor(id),dr=draftFor(id),prevMax=maxOf(id,S.date);
@@ -649,7 +667,8 @@ async function save(id){
     sets.push([w,r]);
   }
   if(!sets.length){toast('Escribe al menos el peso de una serie.');return}
-  const entries=(S.hist[id]||[]).filter(e=>e.d!==S.date).concat([{d:S.date,s:sets}]).sort((a,b)=>a.d<b.d?-1:1);
+  const old=entryOn(id,S.date),t=old&&old.t?old.t:Date.now();
+  const entries=(S.hist[id]||[]).filter(e=>e.d!==S.date).concat([{d:S.date,s:sets,t}]).sort((a,b)=>a.d<b.d?-1:1);
   S.hist[id]=entries;
   if(S.cal.marks[S.date]==='off'){const mk={...S.cal.marks};delete mk[S.date];S.cal={...S.cal,marks:mk};store.saveCal(S.cal).catch(()=>{})}
   delete S.drafts[dKey(id)];persistDrafts();
@@ -674,7 +693,7 @@ document.addEventListener('click',e=>{
   if(ds.treset){tReset();return}
   if(ds.start){openFocus(ds.start);return}
   if(ds.fback){closeFocus();return}
-  if(ds.fnext){const day=curDay(),l=day.exercises,i=l.findIndex(x=>x.id===S.focus);if(l[i+1])openFocus(l[i+1].id);return}
+  if(ds.fnext){const day=curDay(),l=orderedEx(day),i=l.findIndex(x=>x.id===S.focus);if(l[i+1])openFocus(l[i+1].id);return}
   if(ds.fset){S.fSet=+ds.fset;render();return}
   if(ds.month){const [y,m]=S.calMonth.split('-').map(Number);const d=new Date(y,m-1+(+ds.month),1);S.calMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');render();return}
   if(ds.cday){openPick(ds.cday);return}
