@@ -217,6 +217,14 @@ body.kb .timer,body.kb nav.tabs{display:none}
 .hidden-row span.n{flex:1;min-width:0}
 .btn2{height:40px;padding-inline:14px;border-radius:10px;background:var(--surface-2);color:var(--fg);font-weight:600;font-size:14px}
 .btn2:disabled{opacity:.4}
+.bankbtn{display:block;width:100%;margin-top:12px}
+.bankbtn+.btn2{margin-top:10px}
+.bk{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.bk .n{flex:1;min-width:0;font-size:15px}
+.bk .n small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.bk .btn2{height:40px;padding-inline:12px}
+.bk .sq{height:40px}
+.empty.sm{padding:28px 8px}
 </style>
 </head><body>
 
@@ -291,6 +299,16 @@ function fillGroups(r){
   if(r&&Array.isArray(r.days))for(const d of r.days)for(const ex of (d.exercises||[]))if(!('g' in ex)){ex.g=DEFGRP[ex.id]||guessGrp(ex.name);ch=true}
   return ch;
 }
+// Each saved session remembers the workout it was done in (w). Exercises can move between workouts
+// or go to the bank without changing past calendar colors or the order numbers.
+function stampW(r,h){
+  let ch=false;if(!r||!h)return ch;
+  const st=(id,w)=>{for(const e of (h[id]||[]))if(!e.w){e.w=w;ch=true}};
+  if(Array.isArray(r.days))for(const d of r.days)for(const ex of (d.exercises||[]))st(ex.id,d.id);
+  if(Array.isArray(r.bank))for(const b of r.bank)if(b.from)st(b.id,b.from);
+  return ch;
+}
+const bankOf=()=>S.routine&&Array.isArray(S.routine.bank)?S.routine.bank:[];
 const grpOpts=sel=>'<option value="">Sin grupo</option>'+GROUPS.map(g=>`<option${g===sel?' selected':''}>${g}</option>`).join('');
 const allDays=()=>S.routine&&Array.isArray(S.routine.days)?S.routine.days:[];
 const visDays=()=>allDays().filter(d=>!d.hidden);
@@ -302,7 +320,7 @@ const nameOf=id=>{if(id==='x')return 'Entrenado';const d=dayById(id);return d?d.
 async function initStore(){
   if(!lsGet('gs.routine')){lsSet('gs.routine',SEED.routine);lsSet('gs.hist',SEED.hist);lsSet('gs.cal',SEED.cal)}
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-  S.routine=lsGet('gs.routine');if(fillGroups(S.routine))lsSet('gs.routine',S.routine);S.hist=lsGet('gs.hist')||{};S.cal=lsGet('gs.cal')||S.cal;S.loaded=true;
+  S.routine=lsGet('gs.routine');if(fillGroups(S.routine))lsSet('gs.routine',S.routine);S.hist=lsGet('gs.hist')||{};if(stampW(S.routine,S.hist))lsSet('gs.hist',S.hist);S.cal=lsGet('gs.cal')||S.cal;S.loaded=true;
   if(!S.cal.marks)S.cal.marks={};
   if(!lsGet('gs.routine'))banner('No se pudieron guardar los datos en este dispositivo. Si estás en modo privado, sal de él.');
   store={
@@ -350,10 +368,11 @@ function setsFor(id){
    Each saved entry carries t (time of first save); sessions before this feature have no t. */
 function prevOrder(day){
   let prev=null;
-  for(const ex of day.exercises)for(const e of (S.hist[ex.id]||[]))if(e.d<S.date&&(!prev||e.d>prev))prev=e.d;
+  const here=e=>(e.w||day.id)===day.id;
+  for(const ex of day.exercises)for(const e of (S.hist[ex.id]||[]))if(here(e)&&e.d<S.date&&(!prev||e.d>prev))prev=e.d;
   const pos={};if(!prev)return pos;
   const done=[];
-  for(const ex of day.exercises){const e=entryOn(ex.id,prev);if(e&&e.t)done.push([e.t,ex.id])}
+  for(const ex of day.exercises){const e=entryOn(ex.id,prev);if(e&&e.t&&here(e))done.push([e.t,ex.id])}
   done.sort((a,b)=>a[0]-b[0]).forEach(([,id],i)=>pos[id]=i+1);
   return pos;
 }
@@ -389,10 +408,10 @@ function renderInner(){
   if(!day){$('#dayTitle').innerHTML='Gym <span>split</span>';main.innerHTML='<div class="empty"><b>Aún no hay rutina</b>Cuando se cargue tu rutina verás aquí los ejercicios de cada día.</div>';sheets();return}
   $('#dayTitle').innerHTML=esc(day.name)+' <span>day</span>';
   main.innerHTML=(day.exercises.length?(S.edit?day.exercises.map((ex,i)=>editCard(ex,i,day.exercises.length)):orderedEx(day).map(card)).join(''):'<div class="empty"><b>Sin ejercicios</b>Pulsa Editar para añadir el primero.</div>')
-    +(S.edit?'<form class="add" id="addForm"><input id="addName" placeholder="Nuevo ejercicio" autocomplete="off" enterkeyhint="done"><button type="submit">Añadir</button><div class="grps"><span class="gl">Grupo muscular</span>'+GROUPS.map(g=>`<button type="button" data-addg="${g}" class="${S.addG===g?'on':''}">${g}</button>`).join('')+'</div></form><button class="btn2" type="button" data-days="1">Editar entrenos (nombres, colores, añadir o quitar)</button>':'');
+    +(S.edit?'<form class="add" id="addForm"><input id="addName" placeholder="Nuevo ejercicio" autocomplete="off" enterkeyhint="done"><button type="submit">Añadir</button><div class="grps"><span class="gl">Grupo muscular</span>'+GROUPS.map(g=>`<button type="button" data-addg="${g}" class="${S.addG===g?'on':''}">${g}</button>`).join('')+'</div></form><button class="btn2 bankbtn" type="button" data-bank="1">Añadir desde el banco ('+bankOf().length+')</button><button class="btn2" type="button" data-days="1">Editar entrenos (nombres, colores, añadir o quitar)</button>':'');
   sheets();
 }
-function sheets(){if(S.sheet)renderSheet();else if(S.calPick)renderPick();else if(S.daysEdit)renderDays()}
+function sheets(){if(S.bank)renderBank();else if(S.sheet)renderSheet();else if(S.calPick)renderPick();else if(S.daysEdit)renderDays()}
 function renderTabs(){
   const vis=visDays(),nav=$('nav.tabs');
   nav.style.gridTemplateColumns=`repeat(${vis.length+1},minmax(0,1fr))`;
@@ -433,13 +452,13 @@ function card(ex){
   </article>`;
 }
 function editCard(ex,i,len){
-  const c=S.confirmDel===ex.id;
+  const c=S.confirmDel===ex.id,cur=curDay(),others=visDays().filter(d=>!cur||d.id!==cur.id);
   return `<article class="ex" data-id="${ex.id}"><div class="edit-row">
     <input id="name-${ex.id}" data-rename="${ex.id}" value="${esc(ex.name)}" aria-label="Nombre del ejercicio" autocomplete="off">
     <button class="sq" type="button" data-up="${ex.id}" ${i===0?'disabled':''} aria-label="Subir">↑</button>
     <button class="sq" type="button" data-down="${ex.id}" ${i===len-1?'disabled':''} aria-label="Bajar">↓</button>
-    <button class="sq danger${c?' confirm':''}" type="button" data-del="${ex.id}" aria-label="Borrar">${c?'Borrar':'✕'}</button>
-  </div><label class="edit-grp">Grupo<select data-grp="${ex.id}" aria-label="Grupo muscular">${grpOpts(ex.g||'')}</select></label></article>`;
+    <button class="sq danger${c?' confirm':''}" type="button" data-del="${ex.id}" aria-label="Quitar y guardar en el banco">${c?'Al banco':'✕'}</button>
+  </div><label class="edit-grp">Grupo<select data-grp="${ex.id}" aria-label="Grupo muscular">${grpOpts(ex.g||'')}</select></label>${others.length?`<label class="edit-grp">Mover a<select data-move="${ex.id}" aria-label="Mover a otro entreno"><option value="">Elegir entreno…</option>${others.map(d=>`<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('')}</select></label>`:''}</article>`;
 }
 
 /* ---------- full-screen exercise + rest timer ---------- */
@@ -511,7 +530,7 @@ const isoOf=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0
 function autoTypes(){
   const ex2day={},out={};
   for(const d of allDays())for(const e of d.exercises)ex2day[e.id]=d.id;
-  for(const id in S.hist){const dy=ex2day[id];for(const e of S.hist[id]){(out[e.d]=out[e.d]||new Set()).add(dy||'x')}}
+  for(const id in S.hist){const dy=ex2day[id];for(const e of S.hist[id]){(out[e.d]=out[e.d]||new Set()).add(e.w&&dayById(e.w)?e.w:(dy||'x'))}}
   return out;
 }
 let _auto=null;
@@ -585,7 +604,7 @@ function renderCal(){
     <div class="backup"><button type="button" data-export="1">Exportar datos</button><label for="importIn">Importar</label><input type="file" id="importIn" accept="application/json,.json" hidden></div>
     <div class="hint" style="margin:0;text-align:left">Tus datos viven en este iPhone. Exporta una copia de vez en cuando y guárdala en Archivos o iCloud.</div>`;
 }
-function openPick(iso){S.calPick=iso;S.sheet=null;S.daysEdit=false;renderPick()}
+function openPick(iso){S.bank=false;S.calPick=iso;S.sheet=null;S.daysEdit=false;renderPick()}
 function renderPick(){
   const iso=S.calPick,[y,m,d]=iso.split('-').map(Number),ts=typesOn(iso),manual=manualOf(iso);
   const wd=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][new Date(y,m-1,d).getDay()];
@@ -621,7 +640,7 @@ function toggleMark(iso,k){
 }
 
 /* ---------- workouts editor ---------- */
-function openDays(){S.daysEdit=true;S.sheet=null;S.calPick=null;S.confirmDel=null;renderDays()}
+function openDays(){S.bank=false;S.daysEdit=true;S.sheet=null;S.calPick=null;S.confirmDel=null;renderDays()}
 function renderDays(){
   const vis=visDays(),hid=allDays().filter(d=>d.hidden);
   let html=`<div class="grab"></div><button class="close" type="button" data-close>Cerrar</button>
@@ -636,6 +655,23 @@ function renderDays(){
   html+=vis.length<MAXDAYS?'<form class="add" id="daysAdd"><input id="daysAddName" placeholder="Nuevo entreno (ej. Full body)" maxlength="20" autocomplete="off" enterkeyhint="done"><button type="submit">Añadir</button></form>'
     :`<div class="sub">Ya tienes ${MAXDAYS} entrenos, el máximo. Quita uno para añadir otro.</div>`;
   if(hid.length)html+=`<div class="sec">Entrenos ocultos</div>`+hid.map(d=>`<div class="hidden-row"><span class="dot" style="background:${colOf(d.id)}"></span><span class="n">${esc(d.name)}</span><button class="btn2" type="button" data-dshow="${esc(d.id)}" ${vis.length>=MAXDAYS?'disabled':''}>Recuperar</button></div>`).join('');
+  $('#sheetIn').innerHTML=html;$('#sheet').hidden=false;
+}
+function openBank(){S.bank=true;S.sheet=null;S.calPick=null;S.daysEdit=false;S.confirmDel=null;renderBank()}
+function renderBank(){
+  const b=bankOf(),day=curDay();
+  let html=`<div class="grab"></div><button class="close" type="button" data-close>Cerrar</button>
+    <h3>Banco de ejercicios</h3><div class="sub">Ejercicios que quitaste de la rutina, con todo su historial. Pulsa Añadir para llevarlos a ${esc(day?day.name:'este entreno')}.</div>`;
+  if(!b.length)html+='<div class="empty sm"><b>El banco está vacío</b>Cuando quites un ejercicio en modo Editar, se guardará aquí con sus datos.</div>';
+  for(const g of GROUPS.concat('')){
+    const items=b.filter(x=>(GROUPS.includes(x.g)?x.g:'')===g).sort((p,q)=>p.name.localeCompare(q.name,'es'));if(!items.length)continue;
+    html+=`<div class="sec">${g||'Sin grupo'}</div>`+items.map(x=>{
+      const es=entriesOf(x.id),last=es[es.length-1],top=last?Math.max(...last.s.map(s=>s[0]||0)):0,c1=S.confirmDel==='b:'+x.id,c2=S.confirmDel==='b2:'+x.id;
+      return `<div class="bk"><span class="dot" style="background:${colOf(x.from)}"></span><span class="n">${esc(x.name)}<small>${dayById(x.from)?'De '+esc(nameOf(x.from))+' · ':''}${es.length} ${es.length===1?'sesión':'sesiones'}${last?' · último '+fmtN(top)+' kg, '+fmtDate(last.d):''}</small></span>
+        <button class="btn2" type="button" data-bpick="${esc(x.id)}">Añadir</button>
+        <button class="sq danger${c1||c2?' confirm':''}" type="button" data-bdel="${esc(x.id)}" aria-label="Borrar para siempre">${c2?'¿Seguro?':c1?'Borrar':'✕'}</button></div>`}).join('');
+  }
+  if(b.length)html+='<div class="sub" style="margin-top:14px">✕ borra el ejercicio y su historial para siempre. Pide confirmar dos veces.</div>';
   $('#sheetIn').innerHTML=html;$('#sheet').hidden=false;
 }
 function newDayId(){let id;do{id='d-'+Math.random().toString(36).slice(2,7)}while(dayById(id));return id}
@@ -682,8 +718,8 @@ function chart(es){
     <text x="${W-R}" y="${H-6}" font-size="10" fill="var(--faint)" text-anchor="end">${fmtDate(pts[pts.length-1].d)}</text>
   </svg>`;
 }
-function openSheet(id){S.sheet=id;S.calPick=null;S.daysEdit=false;S.confirmDel=null;renderSheet()}
-function closeSheet(){S.sheet=null;S.calPick=null;S.daysEdit=false;S.confirmDel=null;$('#sheet').hidden=true}
+function openSheet(id){S.bank=false;S.sheet=id;S.calPick=null;S.daysEdit=false;S.confirmDel=null;renderSheet()}
+function closeSheet(){S.bank=false;S.sheet=null;S.calPick=null;S.daysEdit=false;S.confirmDel=null;$('#sheet').hidden=true}
 
 /* ---------- actions ---------- */
 let toastT;
@@ -701,7 +737,7 @@ async function save(id){
   }
   if(!sets.length){toast('Escribe al menos el peso de una serie.');return}
   const old=entryOn(id,S.date),t=old&&old.t?old.t:Date.now();
-  const entries=(S.hist[id]||[]).filter(e=>e.d!==S.date).concat([{d:S.date,s:sets,t}]).sort((a,b)=>a.d<b.d?-1:1);
+  const entries=(S.hist[id]||[]).filter(e=>e.d!==S.date).concat([{d:S.date,s:sets,t,w:(curDay()||{}).id||S.day}]).sort((a,b)=>a.d<b.d?-1:1);
   S.hist[id]=entries;
   if(S.cal.marks[S.date]==='off'){const mk={...S.cal.marks};delete mk[S.date];S.cal={...S.cal,marks:mk};store.saveCal(S.cal).catch(()=>{})}
   delete S.drafts[dKey(id)];persistDrafts();
@@ -735,6 +771,14 @@ document.addEventListener('click',e=>{
   if(ds.goal){S.cal={...S.cal,goal:+ds.goal};render();store.saveCal(S.cal).catch(()=>toast('No se pudo guardar el objetivo.'));return}
   if(ds.addg){S.addG=S.addG===ds.addg?'':ds.addg;document.querySelectorAll('[data-addg]').forEach(b=>b.classList.toggle('on',b.dataset.addg===S.addG));return}
   if(ds.export){exportData();return}
+  if(ds.bank){openBank();return}
+  if(ds.bpick){const id=ds.bpick,x=bankOf().find(b=>b.id===id),day=curDay();if(!x||!day)return;S.confirmDel=null;
+    mutateRoutine(r=>{r.bank=(r.bank||[]).filter(b=>b.id!==id);const d=r.days.find(y=>y.id===day.id);if(d&&!d.exercises.some(e=>e.id===id))d.exercises.push({id:x.id,name:x.name,g:x.g||''})});toast(x.name+' añadido a '+day.name);return}
+  if(ds.bdel){const id=ds.bdel,k1='b:'+id,k2='b2:'+id;
+    if(S.confirmDel!==k1&&S.confirmDel!==k2){S.confirmDel=k1;renderBank();return}
+    if(S.confirmDel===k1){S.confirmDel=k2;renderBank();return}
+    S.confirmDel=null;const x=bankOf().find(b=>b.id===id);delete S.hist[id];lsSet('gs.hist',S.hist);
+    mutateRoutine(r=>{r.bank=(r.bank||[]).filter(b=>b.id!==id)});toast((x?x.name:'Ejercicio')+' borrado para siempre');return}
   if(ds.days){openDays();return}
   if(ds.dcol){const id=ds.dcol,c=ds.c;mutateRoutine(r=>{const d=r.days.find(x=>x.id===id);if(d)d.color=c});return}
   if(ds.dup||ds.ddown){const id=ds.dup||ds.ddown,up=!!ds.dup;mutateRoutine(r=>{const vis=r.days.filter(d=>!d.hidden),i=vis.findIndex(d=>d.id===id),j=up?i-1:i+1;if(i<0||j<0||j>=vis.length)return;const a=r.days.indexOf(vis[i]),b=r.days.indexOf(vis[j]);[r.days[a],r.days[b]]=[r.days[b],r.days[a]]});return}
@@ -749,7 +793,7 @@ document.addEventListener('click',e=>{
   if(ds.more){const k=dKey(ds.more);S.setCount[k]=Math.min(10,setsFor(ds.more)+1);render();return}
   if(ds.less){const k=dKey(ds.less);const n=Math.max(1,setsFor(ds.less)-1);S.setCount[k]=n;const d=draftFor(ds.less);d.length=Math.min(d.length,n);render();return}
   if(ds.up||ds.down){const id=ds.up||ds.down;mutateRoutine(r=>{const a=dayOf(r).exercises,i=a.findIndex(x=>x.id===id),j=ds.up?i-1:i+1;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]]});return}
-  if(ds.del){if(S.confirmDel!==ds.del){S.confirmDel=ds.del;render();return}S.confirmDel=null;mutateRoutine(r=>{const d=dayOf(r);d.exercises=d.exercises.filter(x=>x.id!==ds.del)});toast('Ejercicio quitado de la rutina');return}
+  if(ds.del){if(S.confirmDel!==ds.del){S.confirmDel=ds.del;render();return}S.confirmDel=null;mutateRoutine(r=>{const d=dayOf(r),ex=d.exercises.find(x=>x.id===ds.del);d.exercises=d.exercises.filter(x=>x.id!==ds.del);if(ex){r.bank=(r.bank||[]).filter(b=>b.id!==ex.id);r.bank.push({id:ex.id,name:ex.name,g:ex.g||'',from:d.id})}});toast('Guardado en el banco de ejercicios');return}
   if(ds.hdel){const key='h:'+ds.hdel;if(S.confirmDel!==key){S.confirmDel=key;renderSheet();return}S.confirmDel=null;const id=S.sheet;const entries=(S.hist[id]||[]).filter(x=>x.d!==ds.hdel);S.hist[id]=entries;render();store.saveHist(id,entries).then(()=>toast('Sesión borrada'),()=>toast('No se pudo borrar la sesión.'));return}
 });
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
@@ -764,6 +808,9 @@ document.addEventListener('change',e=>{
   if(t.id==='dateIn'){if(t.value){S.date=t.value;S.drafts=Object.assign(lsGet('gs.drafts')||{},S.drafts);render()}return}
   if(t.dataset.rename){const v=t.value.trim();if(!v){t.value=findEx(t.dataset.rename).name;return}const id=t.dataset.rename;mutateRoutine(r=>{for(const d of r.days){const x=d.exercises.find(x=>x.id===id);if(x)x.name=v}})}
   if(t.dataset.grp!=null){const id=t.dataset.grp,g=t.value;mutateRoutine(r=>{for(const d of r.days){const x=d.exercises.find(x=>x.id===id);if(x)x.g=g}});return}
+  if(t.dataset.move!=null){const id=t.dataset.move,to=t.value,cur=curDay();if(!to||!cur||to===cur.id)return;const name=findEx(id).name;S.confirmDel=null;
+    mutateRoutine(r=>{const a=r.days.find(d=>d.id===cur.id),b=r.days.find(d=>d.id===to);if(!a||!b)return;const i=a.exercises.findIndex(x=>x.id===id);if(i<0)return;const [ex]=a.exercises.splice(i,1);if(!b.exercises.some(x=>x.id===id))b.exercises.push(ex)});
+    toast(name+' movido a '+nameOf(to));return}
   if(t.dataset.dname){const v=t.value.trim().slice(0,20),id=t.dataset.dname;if(!v){t.value=nameOf(id);return}mutateRoutine(r=>{const d=r.days.find(x=>x.id===id);if(d)d.name=v})}
 });
 async function exportData(){
@@ -778,6 +825,7 @@ async function exportData(){
 // Accepts copies from the first version (v1) and from this one (v2).
 function importData(d){
   if(!d||d.app!=='gym-split'||!d.routine||!Array.isArray(d.routine.days)||!d.hist||typeof d.hist!=='object')throw 0;
+  stampW(d.routine,d.hist);
   const cal=d.cal&&typeof d.cal==='object'?{marks:d.cal.marks||{},goal:d.cal.goal||4}:{marks:{},goal:4};
   S.hist=d.hist;lsSet('gs.hist',d.hist);
   S.cal=cal;lsSet('gs.cal',cal);
@@ -821,7 +869,7 @@ document.addEventListener('focusout',()=>{setTimeout(()=>{if(!isField(document.a
 if(window.visualViewport)visualViewport.addEventListener('resize',()=>{if(document.body.classList.contains('kb')){clearTimeout(kbT);kbT=setTimeout(revealField,120)}});
 document.addEventListener('focusout',()=>{setTimeout(()=>{if(S.pendingRender&&!typingIn())render()},0)});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){if(S.sheet||S.calPick||S.daysEdit)closeSheet();else if(S.focus)closeFocus()}
+  if(e.key==='Escape'){if(S.bank||S.sheet||S.calPick||S.daysEdit)closeSheet();else if(S.focus)closeFocus()}
   if(e.key==='Enter'&&e.target.matches('.set input')){e.preventDefault();const all=[...e.target.closest('.ex').querySelectorAll('.set input')];const n=all[all.indexOf(e.target)+1];n?n.focus():e.target.blur()}
 });
 
