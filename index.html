@@ -54,6 +54,8 @@ main{display:flex;flex-direction:column;gap:14px;padding-block:16px}
 .start{flex:none;height:40px;padding:0 14px 0 12px;border-radius:20px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:15px;display:inline-flex;align-items:center;gap:6px}
 .ex-head .ord{flex:none;display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;margin-top:-1px;border-radius:12px;background:var(--accent);color:#000;font-weight:800;font-size:14px;line-height:1}
 .ex-head h2{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.05;margin:0;flex:1;min-width:0;text-wrap:balance}
+.ex-head .ttl{flex:1;min-width:0;display:flex;flex-direction:column}
+.ex-head .grp{display:block;margin-top:3px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 .chev{color:var(--faint);font-size:22px;line-height:1}
 .meta{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .meta b{color:var(--fg);font-weight:600}
@@ -85,7 +87,13 @@ main{display:flex;flex-direction:column;gap:14px;padding-block:16px}
 .sq{width:40px;height:44px;border-radius:10px;background:var(--surface-2);color:var(--muted);font-size:18px;flex:none}
 .sq.danger{color:var(--push)}
 .sq.confirm{background:var(--push);color:#fff;width:auto;padding-inline:10px;font-size:13px;font-weight:700}
-.add{display:flex;gap:8px}
+.add{display:flex;gap:8px;flex-wrap:wrap}
+.add .grps{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px}
+.add .grps button{height:32px;padding:0 12px;border-radius:16px;background:var(--surface-2);color:var(--muted);font-size:14px;font-weight:600}
+.add .grps button.on{background:var(--accent);color:var(--on-accent)}
+.add .grps .gl{flex-basis:100%;font-size:12px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.edit-grp{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--faint)}
+.edit-grp select{flex:1;min-width:0;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 10px;font-size:16px}
 .add input{flex:1;min-width:0;height:48px;border-radius:12px;border:1px dashed var(--line);background:transparent;padding:0 14px;font-size:16px}
 .add button{height:48px;padding-inline:16px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:700}
 
@@ -268,6 +276,31 @@ const DEFCOL={push:'#e5484d',pull:'#3e8bff',arm:'#f2c94c',leg:'#30c27a'};
 const PALETTE=['#e5484d','#3e8bff','#f2c94c','#30c27a','#a77bf3','#f06cb4','#2ec4c9','#b8e04a'];
 const PALNAME=['Rojo','Azul','Amarillo','Verde','Morado','Rosa','Turquesa','Lima'];
 const OTHER='#c9ced8';
+/* ---------- muscle groups ---------- */
+const GROUPS=['Pecho','Espalda','Bíceps','Tríceps','Hombro','Cuádriceps','Femoral','Aductores','Glúteo','Gemelos'];
+const DEFGRP={'p-incline':'Pecho','p-aperturas':'Pecho','pu-aperturas-con-polea-baja-hpd4':'Pecho','p-maquina':'Pecho','p-plano':'Pecho',
+ 'p-ext-triceps':'Tríceps','p-nuca':'Tríceps','pu-extensio-n-tri-ceps-unilateral-tvj5':'Tríceps',
+ 'l-remo-bajo':'Espalda','pu-pull-down-unilateral-en-polea-85aq':'Espalda','l-remo-t':'Espalda','l-pulldown-cerrado':'Espalda','pu-pull-over-en-ma-quina-3unv':'Espalda','l-pulldown-uni':'Espalda',
+ 'l-curl-martillo':'Bíceps','pu-curl-bi-ceps-en-polea-rhz4':'Bíceps','l-curl-mancuerna':'Bíceps','pu-curl-biceps-unilateral-polea-t5td':'Bíceps',
+ 'a-militar':'Hombro','a-laterales':'Hombro','a-frontales':'Hombro','a-militar-maq':'Hombro','a-curl-polea':'Bíceps','a-ext-triceps':'Tríceps','ar-curl-bi-ceps-en-polea-hwi3':'Bíceps','ar-extensio-n-de-tri-ceps-unilateral-1ohy':'Tríceps',
+ 'g-squat':'Cuádriceps','g-quad':'Cuádriceps','le-hack-squat-gr5m':'Cuádriceps','g-femoral':'Femoral','g-abduction':'Aductores','le-let-abduction-o35x':'Glúteo',
+ 'd--femoral-unilateral-hjlv':'Femoral','d--femoral-sentado-8s52':'Femoral','d--leg-abduction-81kf':'Glúteo','d--hip-thrust-lynl':'Glúteo','d--remo-en-barra-8sq3':'Espalda','d--remo-polea-cerrado-e51k':'Espalda'};
+// Guess from the name, only for exercises that existed before groups (never for new ones).
+function guessGrp(name){
+  const n=String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const R=[[/tricep|nuca/,'Tríceps'],[/curl|bicep/,'Bíceps'],[/militar|lateral|frontal|hombro/,'Hombro'],[/press|apertura|pecho|fondos/,'Pecho'],
+    [/remo|pull|jalon|dominada|espalda/,'Espalda'],[/femoral|peso muerto rumano/,'Femoral'],[/adduct|aductor/,'Aductores'],[/abduct|hip thrust|glute|gluteo/,'Glúteo'],
+    [/gemelo|calf|talon/,'Gemelos'],[/squat|sentadilla|quad|cuadri|prensa|zancada/,'Cuádriceps']];
+  for(const [re,g] of R)if(re.test(n))return g;
+  return '';
+}
+// One-time: give a group to every exercise that has never had one ('g' missing). Returns true if anything changed.
+function fillGroups(r){
+  let ch=false;
+  if(r&&Array.isArray(r.days))for(const d of r.days)for(const ex of (d.exercises||[]))if(!('g' in ex)){ex.g=DEFGRP[ex.id]||guessGrp(ex.name);ch=true}
+  return ch;
+}
+const grpOpts=sel=>'<option value="">Sin grupo</option>'+GROUPS.map(g=>`<option${g===sel?' selected':''}>${g}</option>`).join('');
 const allDays=()=>S.routine&&Array.isArray(S.routine.days)?S.routine.days:[];
 const visDays=()=>allDays().filter(d=>!d.hidden);
 const dayById=id=>allDays().find(d=>d.id===id);
@@ -278,7 +311,7 @@ const nameOf=id=>{if(id==='x')return 'Entrenado';const d=dayById(id);return d?d.
 async function initStore(){
   if(!lsGet('gs.routine')){lsSet('gs.routine',SEED.routine);lsSet('gs.hist',SEED.hist);lsSet('gs.cal',SEED.cal)}
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-  S.routine=lsGet('gs.routine');S.hist=lsGet('gs.hist')||{};S.cal=lsGet('gs.cal')||S.cal;S.loaded=true;
+  S.routine=lsGet('gs.routine');if(fillGroups(S.routine))lsSet('gs.routine',S.routine);S.hist=lsGet('gs.hist')||{};S.cal=lsGet('gs.cal')||S.cal;S.loaded=true;
   if(!S.cal.marks)S.cal.marks={};
   if(!lsGet('gs.routine'))banner('No se pudieron guardar los datos en este dispositivo. Si estás en modo privado, sal de él.');
   store={
@@ -365,7 +398,7 @@ function renderInner(){
   if(!day){$('#dayTitle').innerHTML='Gym <span>split</span>';main.innerHTML='<div class="empty"><b>Aún no hay rutina</b>Cuando se cargue tu rutina verás aquí los ejercicios de cada día.</div>';sheets();return}
   $('#dayTitle').innerHTML=esc(day.name)+' <span>day</span>';
   main.innerHTML=(day.exercises.length?(S.edit?day.exercises.map((ex,i)=>editCard(ex,i,day.exercises.length)):orderedEx(day).map(card)).join(''):'<div class="empty"><b>Sin ejercicios</b>Pulsa Editar para añadir el primero.</div>')
-    +(S.edit?'<form class="add" id="addForm"><input id="addName" placeholder="Nuevo ejercicio" autocomplete="off" enterkeyhint="done"><button type="submit">Añadir</button></form><button class="btn2" type="button" data-days="1">Editar entrenos (nombres, colores, añadir o quitar)</button>':'');
+    +(S.edit?'<form class="add" id="addForm"><input id="addName" placeholder="Nuevo ejercicio" autocomplete="off" enterkeyhint="done"><button type="submit">Añadir</button><div class="grps"><span class="gl">Grupo muscular</span>'+GROUPS.map(g=>`<button type="button" data-addg="${g}" class="${S.addG===g?'on':''}">${g}</button>`).join('')+'</div></form><button class="btn2" type="button" data-days="1">Editar entrenos (nombres, colores, añadir o quitar)</button>':'');
   sheets();
 }
 function sheets(){if(S.sheet)renderSheet();else if(S.calPick)renderPick();else if(S.daysEdit)renderDays()}
@@ -401,7 +434,7 @@ function card(ex){
   const n=setsFor(id),dr=draftFor(id),prevMax=maxOf(id,S.date);
   const savedPr=saved&&prevMax&&saved.s.some(([w])=>w>prevMax.w);
   return `<article class="ex${saved?' saved':''}" data-id="${id}">
-    <div class="ex-top"><button class="ex-head" type="button" data-open="${id}">${ex.ord?`<span class="ord" title="Posición en el último entreno">${ex.ord}</span>`:''}<h2>${esc(ex.name)}</h2><span class="chev">›</span></button>
+    <div class="ex-top"><button class="ex-head" type="button" data-open="${id}">${ex.ord?`<span class="ord" title="Posición en el último entreno">${ex.ord}</span>`:''}<span class="ttl"><h2>${esc(ex.name)}</h2>${ex.g?`<span class="grp">${esc(ex.g)}</span>`:''}</span><span class="chev">›</span></button>
     <button class="start" type="button" data-start="${id}" aria-label="Empezar ${esc(ex.name)}">${PLAY14}Empezar</button></div>
     ${metaHtml(id,last,max,saved,savedPr)}
     ${setRows(id,n,dr,last,prevMax)}
@@ -415,7 +448,7 @@ function editCard(ex,i,len){
     <button class="sq" type="button" data-up="${ex.id}" ${i===0?'disabled':''} aria-label="Subir">↑</button>
     <button class="sq" type="button" data-down="${ex.id}" ${i===len-1?'disabled':''} aria-label="Bajar">↓</button>
     <button class="sq danger${c?' confirm':''}" type="button" data-del="${ex.id}" aria-label="Borrar">${c?'Borrar':'✕'}</button>
-  </div></article>`;
+  </div><label class="edit-grp">Grupo<select data-grp="${ex.id}" aria-label="Grupo muscular">${grpOpts(ex.g||'')}</select></label></article>`;
 }
 
 /* ---------- full-screen exercise + rest timer ---------- */
@@ -709,6 +742,7 @@ document.addEventListener('click',e=>{
   if(ds.mark){if(ds.mark==='auto'||ds.mark==='off')setMark(S.calPick,ds.mark);else toggleMark(S.calPick,ds.mark);return}
   if(ds.goto){const d=S.calPick,ty=typesOn(d).find(x=>x!=='x'&&dayById(x)&&!dayById(x).hidden)||(visDays()[0]||{}).id;closeSheet();S.date=d;tOff();S.focus=null;goDay(ty);return}
   if(ds.goal){S.cal={...S.cal,goal:+ds.goal};render();store.saveCal(S.cal).catch(()=>toast('No se pudo guardar el objetivo.'));return}
+  if(ds.addg){S.addG=S.addG===ds.addg?'':ds.addg;document.querySelectorAll('[data-addg]').forEach(b=>b.classList.toggle('on',b.dataset.addg===S.addG));return}
   if(ds.export){exportData();return}
   if(ds.days){openDays();return}
   if(ds.dcol){const id=ds.dcol,c=ds.c;mutateRoutine(r=>{const d=r.days.find(x=>x.id===id);if(d)d.color=c});return}
@@ -738,6 +772,7 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='dateIn'){if(t.value){S.date=t.value;S.drafts=Object.assign(lsGet('gs.drafts')||{},S.drafts);render()}return}
   if(t.dataset.rename){const v=t.value.trim();if(!v){t.value=findEx(t.dataset.rename).name;return}const id=t.dataset.rename;mutateRoutine(r=>{for(const d of r.days){const x=d.exercises.find(x=>x.id===id);if(x)x.name=v}})}
+  if(t.dataset.grp!=null){const id=t.dataset.grp,g=t.value;mutateRoutine(r=>{for(const d of r.days){const x=d.exercises.find(x=>x.id===id);if(x)x.g=g}});return}
   if(t.dataset.dname){const v=t.value.trim().slice(0,20),id=t.dataset.dname;if(!v){t.value=nameOf(id);return}mutateRoutine(r=>{const d=r.days.find(x=>x.id===id);if(d)d.name=v})}
 });
 async function exportData(){
@@ -755,7 +790,7 @@ function importData(d){
   const cal=d.cal&&typeof d.cal==='object'?{marks:d.cal.marks||{},goal:d.cal.goal||4}:{marks:{},goal:4};
   S.hist=d.hist;lsSet('gs.hist',d.hist);
   S.cal=cal;lsSet('gs.cal',cal);
-  S.routine=d.routine;lsSet('gs.routine',d.routine);
+  fillGroups(d.routine);S.routine=d.routine;lsSet('gs.routine',d.routine);
   S.drafts={};lsSet('gs.drafts',{});S.setCount={};
 }
 document.addEventListener('change',async e=>{
@@ -774,7 +809,8 @@ document.addEventListener('submit',e=>{
   const v=$('#addName').value.trim();if(!v)return;
   const id=(S.day.slice(0,2)+'-'+v.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)+'-'+Math.random().toString(36).slice(2,6));
   $('#addName').value='';$('#addName').blur();
-  mutateRoutine(r=>{dayOf(r).exercises.push({id,name:v})});toast(v+' añadido');
+  const g=S.addG||'';S.addG='';
+  mutateRoutine(r=>{dayOf(r).exercises.push({id,name:v,g})});toast(v+(g?' ('+g+')':'')+' añadido');
 });
 // keyboard open: hide the fixed timer/tab bar. No forced scrolling: iOS already brings the field
 // into view, and an extra centered scroll made the page creep down on its own while typing.
