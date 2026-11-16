@@ -127,7 +127,7 @@ nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-tem
 .perset{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
 .hist{display:flex;flex-direction:column}
 .hrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
-.hrow .hd{width:64px;flex:none;font-size:13px;color:var(--muted)}
+.hrow .hd{width:84px;flex:none;font-size:13px;color:var(--muted);white-space:nowrap}
 .hrow .hs{flex:1;min-width:0;font-size:15px}
 .hrow .hs .best{color:var(--accent);font-weight:600}
 .close{position:sticky;top:0;float:right;height:32px;padding-inline:12px;border-radius:16px;background:var(--surface-2);color:var(--muted);font-size:14px;font-weight:600}
@@ -375,6 +375,13 @@ function prevOrder(day){
   for(const ex of day.exercises){const e=entryOn(ex.id,prev);if(e&&e.t&&here(e))done.push([e.t,ex.id])}
   done.sort((a,b)=>a[0]-b[0]).forEach(([,id],i)=>pos[id]=i+1);
   return pos;
+}
+/* Position of an exercise within its workout that day, from the saved times (t). 0 if unknown. */
+function dayPos(id,e){
+  if(!e||!e.t)return 0;
+  let n=1;
+  for(const k in S.hist){if(k===id)continue;const o=(S.hist[k]||[]).find(x=>x.d===e.d);if(o&&o.t&&(o.w||'')===(e.w||'')&&o.t<e.t)n++}
+  return n;
 }
 function orderedEx(day){
   if(!day)return [];
@@ -693,7 +700,7 @@ function renderSheet(){
   html+=`<div class="sec">Progreso · peso máximo por sesión</div><div class="chart">${chart(es)}</div>`;
   if(ps.length)html+=`<div class="sec">Máximo por serie</div><div class="perset">${ps.map((b,i)=>b?`<div class="stat"><div class="k">Serie ${i+1}</div><div class="v">${fmtN(b.w)}<small> kg</small></div><div class="d">× ${fmtN(b.r)} · ${fmtDate(b.d)}</div></div>`:'').join('')}</div>`;
   html+=`<div class="sec">Historial</div><div class="hist">${es.length?es.slice().reverse().map(e=>{const top=Math.max(...e.s.map(s=>s[0]||0));const c=S.confirmDel==='h:'+e.d;
-    return `<div class="hrow"><span class="hd">${fmtDate(e.d)}</span><span class="hs">${e.s.map(([w,r])=>`<span class="${w===top?'best':''}">${fmtN(w)}×${fmtN(r)}</span>`).join(' · ')}</span><button class="sq danger${c?' confirm':''}" type="button" data-hdel="${e.d}" aria-label="Borrar sesión">${c?'Borrar':'✕'}</button></div>`}).join(''):'<div class="sub">Aún no hay sesiones.</div>'}</div>`;
+    return `<div class="hrow"><span class="hd">${fmtDate(e.d)}${(n=>n?' · '+n+'º':'')(dayPos(id,e))}</span><span class="hs">${e.s.map(([w,r])=>`<span class="${w===top?'best':''}">${fmtN(w)}×${fmtN(r)}</span>`).join(' · ')}</span><button class="sq danger${c?' confirm':''}" type="button" data-hdel="${e.d}" aria-label="Borrar sesión">${c?'Borrar':'✕'}</button></div>`}).join(''):'<div class="sub">Aún no hay sesiones.</div>'}</div>`;
   $('#sheetIn').innerHTML=html;$('#sheet').hidden=false;
 }
 function chart(es){
